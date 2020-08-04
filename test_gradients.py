@@ -1,6 +1,7 @@
 from unittest import TestCase, main
 import numpy as np
 from ddt import ddt, data
+from qiskit.aqua.operators import I, X, Y, Z
 from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit.quantum_info import Statevector
 
@@ -46,6 +47,29 @@ class TestGradients(TestCase):
 
         # reference value
         ref = [-0.5979106735501365, 0.3849522583908403]
+
+        np.testing.assert_array_almost_equal(grads, ref)
+
+    @data(grad, itgrad)
+    def test_larger_circuit(self, gradient_function):
+        op = (Y ^ Z) + 3 * (X ^ X) + (Z ^ I) + (I ^ Z) + (I ^ X)
+        op = op.to_matrix_op().primitive
+
+        theta = [0.275932, 0.814824, 0.670661, 0.627729, 0.596198]
+
+        ansatz = QuantumCircuit(2)
+        ansatz.h([0, 1])
+        ansatz.ry(theta[0], 0)
+        ansatz.ry(theta[1], 1)
+        ansatz.rz(theta[2], 0)
+        ansatz.rz(theta[3], 1)
+        ansatz.cx(0, 1)
+        ansatz.crx(theta[4], 1, 0)
+
+        init = Statevector.from_label('00')
+        grads = gradient_function(ansatz, op, init)
+        ref = [1.2990890015773053, 0.47864124516756174, 1.9895319019377231,
+               0.09137636702470253, 0.40256649191876637]
 
         np.testing.assert_array_almost_equal(grads, ref)
 
