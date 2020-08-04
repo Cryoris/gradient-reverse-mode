@@ -1,7 +1,7 @@
 from functools import reduce
 from qiskit.circuit import QuantumCircuit
-from split_circuit import split
-from gradient_lookup import analytic_gradient
+from .split_circuit import split
+from .gradient_lookup import analytic_gradient
 
 
 def grad(ansatz, op, init):

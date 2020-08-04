@@ -1,2 +1,3 @@
 legacy
 __pycache__
+*.npy
