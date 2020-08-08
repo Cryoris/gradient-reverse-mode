@@ -5,14 +5,15 @@ from qiskit.aqua.operators import I, X, Y, Z
 from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit.quantum_info import Statevector
 
-from circuit_gradients import grad, itgrad
+# from gradients import grad, itgrad
+from gradients import StateGradient
 
 
 @ddt
 class TestGradients(TestCase):
     """Test the computation of the gradients."""
 
-    @data(itgrad, grad)
+    @data('reference_gradients', 'iterative_gradients')
     def test_rx(self, gradient_function):
         # the input state
         init = Statevector.from_label('1')
@@ -26,14 +27,16 @@ class TestGradients(TestCase):
         op = QuantumCircuit(1)
         op.h(0)
 
-        grads = gradient_function(ansatz, op, init)
+        # set up gradient object and compute gradient
+        grad = StateGradient(op, ansatz, init)
+        grads = getattr(grad, gradient_function)()
 
         # reference value
         ref = [-0.4451734157850243]
 
         np.testing.assert_array_almost_equal(grads, ref)
 
-    @data(itgrad, grad)
+    @data('reference_gradients', 'iterative_gradients')
     def test_rxry(self, gradient_function):
         p = [0.8, 0.2]
 
@@ -43,14 +46,17 @@ class TestGradients(TestCase):
 
         op = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
         init = Statevector.from_int(1, dims=(2,))
-        grads = gradient_function(ansatz, op, init)
+
+        # set up gradient object and compute gradient
+        grad = StateGradient(op, ansatz, init)
+        grads = getattr(grad, gradient_function)()
 
         # reference value
         ref = [-0.5979106735501365, 0.3849522583908403]
 
         np.testing.assert_array_almost_equal(grads, ref)
 
-    @data(grad, itgrad)
+    @data('reference_gradients', 'iterative_gradients')
     def test_larger_circuit(self, gradient_function):
         op = (Y ^ Z) + 3 * (X ^ X) + (Z ^ I) + (I ^ Z) + (I ^ X)
         op = op.to_matrix_op().primitive
@@ -67,7 +73,11 @@ class TestGradients(TestCase):
         ansatz.crx(theta[4], 1, 0)
 
         init = Statevector.from_label('00')
-        grads = gradient_function(ansatz, op, init)
+
+        # set up gradient object and compute gradient
+        grad = StateGradient(op, ansatz, init)
+        grads = getattr(grad, gradient_function)()
+
         ref = [1.2990890015773053, 0.47864124516756174, 1.9895319019377231,
                0.09137636702470253, 0.40256649191876637]
 
@@ -83,11 +93,15 @@ class TestGradients(TestCase):
 
         op = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
         init = Statevector.from_int(1, dims=(2,))
-        grad = itgrad(ansatz, op, init, [p[1]], dict(zip(p, values)))[0]
+
+        # set up gradient object and compute gradient
+        grad = StateGradient(op, ansatz, init)
+        grads = grad.iterative_gradients_selective([p[1]], dict(zip(p, values)))[0]
+
         # reference value
         ref = 0.3849522583908403
 
-        self.assertAlmostEqual(grad, ref)
+        self.assertAlmostEqual(grads, ref)
 
 
 if __name__ == '__main__':
