@@ -33,7 +33,28 @@ class StateGradient:
         return grads
 
     def iterative_gradients(self):
-        return self.iterative_gradients_selective('all')
+        ulist = self.unitaries
+        phi = reduce(lambda x, y: x.evolve(y), ulist, self.state_in)
+        # phi = init.evolve(ansatz)
+        lam = phi.evolve(self.operator)
+
+        num_parameters = len(ulist)
+        grads = []
+        for j in reversed(range(num_parameters)):
+            uj = ulist[j]
+            deriv = analytic_gradient(uj)
+            uj_dagger = uj.inverse()
+
+            phi = phi.evolve(uj_dagger)
+            # TODO use projection
+            grad = 2 * sum(coeff * lam.conjugate().data.dot(phi.evolve(gate).data)
+                           for coeff, gate in deriv).real
+            grads += [grad]
+
+            if j > 0:
+                lam = lam.evolve(uj_dagger)
+
+        return list(reversed(grads))
 
     def iterative_gradients_selective(self, parameters, parameter_binds=None):
         op, ansatz, init = self.operator, self.ansatz, self.state_in
