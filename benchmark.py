@@ -8,7 +8,7 @@ from gradients import StateGradient
 from scipy.optimize import curve_fit
 from qiskit.quantum_info import Statevector
 
-NUM_PROCESSES = 3
+NUM_PROCESSES = 2
 
 
 class Benchmark:
@@ -19,7 +19,7 @@ class Benchmark:
         self.verbose = False
 
     def run_benchmark(self, library_circuit, filename=None):
-        # store the runtime and memory as dicts, such that
+        # store the runtime as dict in the following format
         # runtime = {'grad':
         #             {'avg': {num_qubits: avg_runtime, ...}
         #              'std': {num_qubits, std_runtime, ...}
@@ -48,7 +48,6 @@ class Benchmark:
                 print()
                 print('num_qubits:', num_qubits)
                 print('reps:', reps)
-                print('runs:')
 
             # compute the average over nreps repetitions
 
@@ -58,13 +57,10 @@ class Benchmark:
                 all_results = pool.map(single_run, args)
 
             # extract the results
-            grad_runtimes, grad_memory_peaks = [], []
-            itgrad_runtimes, itgrad_memory_peaks = [], []
-            for (times, peaks) in all_results:
-                grad_runtimes.append(times[0])
-                grad_memory_peaks.append(peaks[0])
-                itgrad_runtimes.append(times[1])
-                itgrad_memory_peaks.append(peaks[1])
+            grad_runtimes, itgrad_runtimes = [], []
+            for (grad_time, itgrad_time) in all_results:
+                grad_runtimes.append(grad_time)
+                itgrad_runtimes.append(itgrad_time)
 
             num_parameters = library_circuit.num_parameters
             runtime['num_parameters'].append(num_parameters)
@@ -73,16 +69,11 @@ class Benchmark:
             runtime['itgrad']['avg'].append(np.mean(itgrad_runtimes))
             runtime['itgrad']['std'].append(np.std(itgrad_runtimes))
 
-            memory['num_parameters'].append(num_parameters)
-            memory['grad']['avg'].append(np.mean(grad_memory_peaks))
-            memory['grad']['std'].append(np.std(grad_memory_peaks))
-            memory['itgrad']['avg'].append(np.mean(itgrad_memory_peaks))
-            memory['itgrad']['std'].append(np.std(itgrad_memory_peaks))
-
-        self.last_run = {'runtime': runtime, 'memory': memory}
+        self.last_run = runtime
 
         if filename is None:
-            filename = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}_c{library_circuit.name}'
+            filename = f'{library_circuit.name}_' + \
+                f'q{num_qubits}_r{self.num_reps[0]}_{self.num_reps[-1]}'
 
         print(self.last_run)
 
@@ -94,16 +85,14 @@ class Benchmark:
     def load_benchmark(self, filename):
         return np.load(filename, allow_pickle=True).item()
 
-    def plot(self, key='runtime', filename=None, saveas=None, show=False, cutoffs=None):
+    def plot(self, filename=None, saveas=None, show=False, cutoffs=None):
         if filename is None:
             try:
-                benchmark = self.last_run
+                data = self.last_run
             except NameError:
                 raise RuntimeError('Run a benchmark or pass a filename.')
         else:
-            benchmark = self.load_benchmark(filename)
-
-        data = benchmark[key]
+            data = self.load_benchmark(filename)
 
         colors = ['tab:blue', 'tab:orange']
         markers = ['o', '^']
@@ -113,7 +102,7 @@ class Benchmark:
         if cutoffs is None:
             cutoffs = [0, 0]
 
-        plt.figure()
+        plt.figure(figsize=(4, 3))
         plt.loglog()  # shortcut for getting log scaling on x and y axis
         for (
             method, color, marker, line, label, cutoff
@@ -132,9 +121,11 @@ class Benchmark:
             plt.plot(nums_parameters, nums_parameters ** a * np.exp(b), 'k' + line,
                      label=r'$O^{' + f'{np.round(a, 2)}' + r'}$')
 
-        plt.title('Gradient ' + key + ' comparison')
+        # plt.title('Gradient run comparison')
         plt.xlabel('number of ansatz parameters, $P$')
         plt.ylabel('time [$s$]')
+        ax = plt.axes()
+        # plt.text(-0.1, 1, '$(a)$', transform=ax.transAxes, usetex=True, fontsize=12)
 
         handles, labels = plt.gca().get_legend_handles_labels()
         order = [2, 3, 0, 1]
@@ -146,41 +137,20 @@ class Benchmark:
             saveas = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}_{key}.pdf'
 
         plt.grid()
-        plt.savefig('img/' + saveas)
+        plt.savefig('img/' + saveas, bbox_inches='tight')
         if show:
             plt.show()
 
 
 def single_run(arg):
     ansatz, op, state_in = arg
-    times, peaks = [], []
+    runtimes = []
     grad = StateGradient(op, ansatz, state_in)
     for method in ['reference_gradients', 'iterative_gradients']:
-        # tracemalloc.start()
         t0 = time.time()
         _ = getattr(grad, method)()  # run gradient computation
-        # peak = np.sum(memory_usage(getattr(grad, method),
-        #                            include_children=True,
-        #                            multiprocess=True))
         te = time.time()
         peak = 0
-        # peak, _ = tracemalloc.get_traced_memory()
-        # tracemalloc.stop()
-        times.append(te - t0)
-        peaks.append(peak)
+        runtimes.append(te - t0)
 
-    return times, peaks
-
-
-if __name__ == '__main__':
-    from qiskit.circuit.library import EfficientSU2
-    from qiskit.aqua.operators import H
-
-    reps = 2 ** np.arange(3, 8)
-    nreps = 24
-
-    b = Benchmark(reps, H, nreps)
-    b.verbose = True
-    b.run_benchmark(EfficientSU2(5, entanglement='linear'))
-    b.plot('runtime')
-    # b.plot('memory')
+    return runtimes
