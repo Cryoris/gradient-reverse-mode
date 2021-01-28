@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 import numpy as np
 from ddt import ddt, data
-from qiskit.aqua.operators import I, X, Y, Z
+from qiskit.opflow import I, X, Y, Z
 from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit.quantum_info import Statevector
 
