@@ -1,24 +1,36 @@
+"""A class to run benchmarks of gradient calculation runtimes."""
+
 import time
-import tracemalloc
 from multiprocessing import Pool
-from memory_profiler import memory_usage
 import numpy as np
-import matplotlib.pyplot as plt
-from gradients import StateGradient
 from scipy.optimize import curve_fit
+from matplotlib import pyplot as plt
 from qiskit.quantum_info import Statevector
+
+from gradients import StateGradient
 
 NUM_PROCESSES = 2
 
 
 class Benchmark:
+    """A class to run benchmarks of gradient calculation runtimes."""
+
     def __init__(self, reps, single_qubit_op, nreps):
         self.num_reps = reps
         self.single_qubit_op = single_qubit_op
         self.nreps = nreps
         self.verbose = False
+        self.last_run = None
 
     def run_benchmark(self, library_circuit, filename=None):
+        """Run a single benchmark.
+
+        Args:
+            library_circuit (QuantumCircuit): A circuit that allows to assign parameters via
+                an array of values.
+            filename (str, optional): A file to store the benchmark results. If None is given,
+                a default filename is used.
+        """
         # store the runtime as dict in the following format
         # runtime = {'grad':
         #             {'avg': {num_qubits: avg_runtime, ...}
@@ -28,9 +40,6 @@ class Benchmark:
         runtime = {'num_parameters': [],
                    'grad': {'avg': [], 'std': []},
                    'itgrad': {'avg': [], 'std': []}}
-        memory = {'num_parameters': [],
-                  'grad': {'avg': [], 'std': []},
-                  'itgrad': {'avg': [], 'std': []}}
 
         for reps in self.num_reps:
             # resize and parameterize library circuit
@@ -41,7 +50,8 @@ class Benchmark:
 
             # get operator and input state of proper size
             num_qubits = library_circuit.num_qubits
-            op = (self.single_qubit_op ^ num_qubits).to_matrix_op().primitive
+            operator = (self.single_qubit_op ^
+                        num_qubits).to_matrix_op().primitive
             state_in = Statevector.from_label('0' * num_qubits)
 
             if self.verbose:
@@ -52,7 +62,7 @@ class Benchmark:
             # compute the average over nreps repetitions
 
             # run the number of runs in parallel
-            args = self.nreps * [(ansatz, op, state_in)]
+            args = self.nreps * [(ansatz, operator, state_in)]
             with Pool(processes=NUM_PROCESSES) as pool:
                 all_results = pool.map(single_run, args)
 
@@ -80,17 +90,29 @@ class Benchmark:
         self.store_benchmark(filename)
 
     def store_benchmark(self, filename):
+        """Store the last benchmark."""
         np.save(filename, self.last_run)
 
     def load_benchmark(self, filename):
+        """Load a benchmark from ``filename``."""
         return np.load(filename, allow_pickle=True).item()
 
     def plot(self, filename=None, saveas=None, show=False, cutoffs=None):
+        """Plot the a set of benchmarks.
+
+        Args:
+            filename (str): The filename to load the data from. If None, the last run is used. If
+                no last run exists, an error is thrown.
+            saveas (str): The filename for the plots. If None, a default name is generated.
+            show (bool): If True, shows the plots after saving them using ``pyplot.show()``.
+            cutoffs (list): A list with two integers specifying how many runtimes to skip 
+                for calculating the fit. Can be useful since the asympyotic runtimes can be 
+                misrepresented for small system sizes.
+        """
         if filename is None:
-            try:
-                data = self.last_run
-            except NameError:
+            if self.last_run is None:
                 raise RuntimeError('Run a benchmark or pass a filename.')
+            data = self.last_run
         else:
             data = self.load_benchmark(filename)
 
@@ -105,19 +127,21 @@ class Benchmark:
         plt.figure(figsize=(4, 3))
         plt.loglog()  # shortcut for getting log scaling on x and y axis
         for (
-            method, color, marker, line, label, cutoff
+                method, color, marker, line, label, cutoff
         ) in zip(
             methods, colors, markers, linestyles, labels, cutoffs
         ):
             avg = data[method]['avg']
             std = data[method]['std']
             nums_parameters = data['num_parameters']
-            plt.errorbar(nums_parameters, avg, yerr=std, color=color, marker=marker, label=label)
+            plt.errorbar(nums_parameters, avg, yerr=std,
+                         color=color, marker=marker, label=label)
 
             avg = avg[cutoff:]
             std = std[cutoff:]
             nums_parameters = nums_parameters[cutoff:]
-            (a, b), _ = curve_fit(lambda x, a, b: a * x + b, np.log(nums_parameters), np.log(avg))
+            (a, b), _ = curve_fit(lambda x, a, b: a *
+                                  x + b, np.log(nums_parameters), np.log(avg))
             plt.plot(nums_parameters, nums_parameters ** a * np.exp(b), 'k' + line,
                      label=r'$O^{' + f'{np.round(a, 2)}' + r'}$')
 
@@ -132,9 +156,10 @@ class Benchmark:
         plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], loc='best',
                    ncol=2)
         # plt.legend(loc='best', ncol=2)
-        plt.xticks([50, 100, 500], [r'$0.5 \cdot 10^2$', r'$10^2$', r'$0.5 \cdot 10^3$'])
+        plt.xticks([50, 100, 500], [r'$0.5 \cdot 10^2$',
+                                    r'$10^2$', r'$0.5 \cdot 10^3$'])
         if saveas is None:
-            saveas = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}_{key}.pdf'
+            saveas = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}.pdf'
 
         plt.grid()
         plt.savefig('img/' + saveas, bbox_inches='tight')
@@ -143,14 +168,16 @@ class Benchmark:
 
 
 def single_run(arg):
-    ansatz, op, state_in = arg
+    """Execute a single run of the gradient calculation.
+
+    This is in a separate function for multiprocessing.
+    """
+    ansatz, operator, state_in = arg
     runtimes = []
-    grad = StateGradient(op, ansatz, state_in)
+    grad = StateGradient(operator, ansatz, state_in)
     for method in ['reference_gradients', 'iterative_gradients']:
-        t0 = time.time()
+        start = time.time()
         _ = getattr(grad, method)()  # run gradient computation
-        te = time.time()
-        peak = 0
-        runtimes.append(te - t0)
+        runtimes.append(time.time() - start)
 
     return runtimes
