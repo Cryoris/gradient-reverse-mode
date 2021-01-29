@@ -95,13 +95,37 @@ class TestGradients(TestCase):
         init = Statevector.from_int(1, dims=(2,))
 
         # set up gradient object and compute gradient
-        grad = StateGradient(op, ansatz, init)
-        grads = grad.iterative_gradients_selective([p[1]], dict(zip(p, values)))[0]
+        grad = StateGradient(op, ansatz, init, [p[1]])
+        grads = grad.iterative_gradients(dict(zip(p, values)))[0]
 
         # reference value
         ref = 0.3849522583908403
 
         self.assertAlmostEqual(grads, ref)
+
+    @data('reference_gradients', 'iterative_gradients')
+    def test_partial_large_circuit(self, method):
+        from qiskit.circuit.library import RealAmplitudes, ZFeatureMap
+        from gradients.split_circuit import split
+        np.random.seed(21)
+
+        featuremap = ZFeatureMap(2, reps=1)
+        featuremap.assign_parameters(np.random.random(
+            featuremap.num_parameters), inplace=True)
+
+        ansatz = RealAmplitudes(2, reps=1)
+        params = ansatz.ordered_parameters[:]
+        values = np.random.random(ansatz.num_parameters)
+        init = Statevector.from_int(1, dims=(2, 2))
+
+        circuit = featuremap.compose(ansatz)
+
+        grad = StateGradient(X ^ X, circuit, init, params)
+        grads = getattr(grad, method)(dict(zip(params, values)))
+        ref = [-0.7700884147948044, 0.011116605029003569, -0.6889501710944109, 
+               -0.07972088641561373]
+
+        np.testing.assert_array_almost_equal(grads, ref)
 
 
 if __name__ == '__main__':

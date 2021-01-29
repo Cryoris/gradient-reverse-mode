@@ -22,12 +22,14 @@ class Benchmark:
         self.verbose = False
         self.last_run = None
 
-    def run_benchmark(self, library_circuit, filename=None):
+    def run_benchmark(self, library_circuit, target_parameters=None, filename=None):
         """Run a single benchmark.
 
         Args:
             library_circuit (QuantumCircuit): A circuit that allows to assign parameters via
                 an array of values.
+            target_parameters (List[Parameter]): The parameters with respect to which to derive.
+                If None, the derivative for all parameters is computed (also bound parameters!).
             filename (str, optional): A file to store the benchmark results. If None is given,
                 a default filename is used.
         """
@@ -45,7 +47,7 @@ class Benchmark:
             # resize and parameterize library circuit
             library_circuit.reps = reps
             ansatz = library_circuit.assign_parameters(
-                np.random.random(library_circuit.num_parameters)
+                np.random.random(library_circuit.num_parameters)  # pylint: disable=no-member
             )
 
             # get operator and input state of proper size
@@ -105,8 +107,8 @@ class Benchmark:
                 no last run exists, an error is thrown.
             saveas (str): The filename for the plots. If None, a default name is generated.
             show (bool): If True, shows the plots after saving them using ``pyplot.show()``.
-            cutoffs (list): A list with two integers specifying how many runtimes to skip 
-                for calculating the fit. Can be useful since the asympyotic runtimes can be 
+            cutoffs (list): A list with two integers specifying how many runtimes to skip
+                for calculating the fit. Can be useful since the asympyotic runtimes can be
                 misrepresented for small system sizes.
         """
         if filename is None:
