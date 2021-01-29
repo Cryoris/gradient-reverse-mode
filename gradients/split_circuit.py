@@ -31,7 +31,7 @@ def split(circuit, parameters='all',
         else:
             raise NotImplementedError('Unsupported type of parameters:', parameters)
 
-        new_split = (len(params) > 0)
+        new_split = bool(len(params) > 0)
 
         if new_split:
             if separate_parameterized_gates and len(sub.data) > 0:
@@ -47,7 +47,7 @@ def split(circuit, parameters='all',
             sub.data += [op]
 
     if len(sub.data) > 0:  # handle leftover gates
-        if separate_parameterized_gates:
+        if separate_parameterized_gates or len(circuits) == 0:
             corresponding_parameters.append(params)
             circuits.append(sub)  # create new if parameterized gates should be separated
         else:

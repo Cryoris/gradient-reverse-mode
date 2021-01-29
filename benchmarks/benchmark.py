@@ -22,14 +22,13 @@ class Benchmark:
         self.verbose = False
         self.last_run = None
 
-    def run_benchmark(self, library_circuit, target_parameters=None, filename=None):
+    def run_benchmark(self, library_circuit, target_parameters='all', filename=None):
         """Run a single benchmark.
 
         Args:
             library_circuit (QuantumCircuit): A circuit that allows to assign parameters via
                 an array of values.
-            target_parameters (List[Parameter]): The parameters with respect to which to derive.
-                If None, the derivative for all parameters is computed (also bound parameters!).
+            target_parameters (str): 'all' for all parameters, 'free' for all free parameters.
             filename (str, optional): A file to store the benchmark results. If None is given,
                 a default filename is used.
         """
@@ -46,14 +45,17 @@ class Benchmark:
         for reps in self.num_reps:
             # resize and parameterize library circuit
             library_circuit.reps = reps
-            ansatz = library_circuit.assign_parameters(
-                np.random.random(library_circuit.num_parameters)  # pylint: disable=no-member
-            )
+
+            # pylint: disable=no-member
+            parameters = np.random.random(library_circuit.num_parameters)
+            if target_parameters == 'all':
+                ansatz = library_circuit.assign_parameters(parameters)
+            else:
+                ansatz = library_circuit
 
             # get operator and input state of proper size
             num_qubits = library_circuit.num_qubits
-            operator = (self.single_qubit_op ^
-                        num_qubits).to_matrix_op().primitive
+            operator = (self.single_qubit_op ^ num_qubits).to_matrix_op().primitive
             state_in = Statevector.from_label('0' * num_qubits)
 
             if self.verbose:
@@ -62,9 +64,18 @@ class Benchmark:
                 print('reps:', reps)
 
             # compute the average over nreps repetitions
-
             # run the number of runs in parallel
-            args = self.nreps * [(ansatz, operator, state_in)]
+            if target_parameters == 'all':
+                args = self.nreps * [(ansatz, operator, state_in, None, None)]
+            else:
+                free_parameters = list(ansatz._parameter_table.keys())
+                parameter_binds = dict(zip(free_parameters, parameters))
+                args = self.nreps * [(ansatz, operator, state_in, free_parameters,
+                                      parameter_binds)]
+
+            # all_results = []
+            # for i, arg in enumerate(args):
+            #     all_results.append(single_run(arg))
             with Pool(processes=NUM_PROCESSES) as pool:
                 all_results = pool.map(single_run, args)
 
@@ -174,12 +185,12 @@ def single_run(arg):
 
     This is in a separate function for multiprocessing.
     """
-    ansatz, operator, state_in = arg
+    ansatz, operator, state_in, target_parameters, parameter_binds = arg
     runtimes = []
-    grad = StateGradient(operator, ansatz, state_in)
+    grad = StateGradient(operator, ansatz, state_in, target_parameters)
     for method in ['reference_gradients', 'iterative_gradients']:
         start = time.time()
-        _ = getattr(grad, method)()  # run gradient computation
+        _ = getattr(grad, method)(parameter_binds)  # run gradient computation
         runtimes.append(time.time() - start)
 
     return runtimes

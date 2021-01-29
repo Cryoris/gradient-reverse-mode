@@ -29,10 +29,14 @@ class Classification(QuantumCircuit):
 
     def assign_parameters(self, params, inplace=False):
         """Assign parameters."""
-        if not isinstance(params, (list, np.ndarray)):
+        if isinstance(params, (list, np.ndarray)):
             params = dict(zip(self._params[:], params))
 
         return super().assign_parameters(params, inplace=inplace)
+
+    @property
+    def ordered_parameters(self):
+        return list(self._parameter_table.keys())
 
     def _build(self):
         # wipe current state
@@ -53,12 +57,10 @@ class Classification(QuantumCircuit):
         self.compose(featmap, inplace=True)
         self.compose(ansatz, inplace=True)
 
-        print(self.draw())
-
 
 def run_featuremap():
     circuit = Classification(4)
 
     benchmark = Benchmark(2 ** np.arange(2, 5), H, 10)
-    benchmark.run_benchmark(circuit)
+    benchmark.run_benchmark(circuit, 'free')
     benchmark.plot(show=True)
