@@ -128,18 +128,26 @@ class TestGradients(TestCase):
 
     @data('reference_gradients', 'iterative_gradients')
     def test_product_rule(self, method):
-        x = Parameter('x')
+        x, y = Parameter('x'), Parameter('y')
         circuit = QuantumCircuit(1)
         circuit.rx(x, 0)
         circuit.ry(x, 0)
+        circuit.rz(y, 0)
         circuit.rx(x, 0)
+        circuit.h(0)
+        circuit.rx(y, 0)
 
         state_in = Statevector.from_int(1, dims=(2,))
 
-        grad = StateGradient(Z, circuit, state_in, [x])
-        grads = getattr(grad, method)({x: 1})
+        parameter_binds = {x: 1, y: 2}
 
-        print(Gradient().convert(~StateFn(Z) @ StateFn(circuit), params=[x]).bind_parameters({x: 1}).eval())
+        grad = StateGradient(Z, circuit, state_in, [x, y])
+        grads = getattr(grad, method)(parameter_binds)
+
+        ref_grad = Gradient().convert(~StateFn(Z) @ StateFn(circuit), params=[x, y])
+        ref = ref_grad.bind_parameters(parameter_binds).eval()
+
+        np.testing.assert_array_almost_equal(grads, ref)
 
 
 
