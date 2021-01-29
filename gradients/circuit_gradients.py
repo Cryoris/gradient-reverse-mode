@@ -37,7 +37,7 @@ class StateGradient:
         else:
             raise NotImplementedError('Unsupported type of ansatz.')
 
-    def reference_gradients(self, parameter_binds=None):
+    def reference_gradients(self, parameter_binds=None, return_parameters=False):
         op, ansatz, init = self.operator, self.ansatz, self.state_in
 
         unitaries, paramlist = self.unitaries, self.paramlist
@@ -71,9 +71,17 @@ class StateGradient:
                 phi = reduce(lambda x, y: x.evolve(y), dj_unitaries, init)
                 grad += coeff * lam.conjugate().data.dot(phi.data)
             grads += [2 * grad.real]
-        return grads
 
-    def iterative_gradients(self, parameter_binds=None):
+        if parameter_binds == {}:
+            return grads
+
+        accumulated, unique_params = self._accumulate_product_rule(grads)
+        if return_parameters:
+            return accumulated, unique_params
+
+        return accumulated
+
+    def iterative_gradients(self, parameter_binds=None, return_parameters=False):
         op, ansatz, init = self.operator, self.ansatz, self.state_in
 
         ulist, paramlist = self.unitaries, self.paramlist
@@ -111,13 +119,31 @@ class StateGradient:
             if j > 0:
                 lam = lam.evolve(uj_dagger)
 
-        return list(reversed(grads))
+        if parameter_binds == {}:
+            return list(reversed(grads))
+
+        accumulated, unique_params = self._accumulate_product_rule(
+            list(reversed(grads)))
+        if return_parameters:
+            return accumulated, unique_params
+
+        return accumulated
+
+    def _accumulate_product_rule(self, gradients):
+        grads = {}
+        for paramlist, grad in zip(self.paramlist, gradients):
+            # all our gates only have one single parameter
+            param = paramlist[0]
+            grads[param] = grads.get(param, 0) + grad
+
+        return list(grads.values()), list(grads.keys())
 
 
 # pylint: disable=inconsistent-return-statements
 def _bind(circuits, parameter_binds, inplace=False):
     if not isinstance(circuits, list):
-        existing_parameter_binds = {p: parameter_binds[p] for p in circuits.parameters}
+        existing_parameter_binds = {
+            p: parameter_binds[p] for p in circuits.parameters}
         return circuits.assign_parameters(existing_parameter_binds, inplace=inplace)
 
     bound = []

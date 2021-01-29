@@ -1,8 +1,9 @@
 from unittest import TestCase, main
 import numpy as np
 from ddt import ddt, data
-from qiskit.opflow import I, X, Y, Z
-from qiskit.circuit import QuantumCircuit, ParameterVector
+from qiskit.opflow import I, X, Y, Z, Gradient, StateFn
+from qiskit.circuit import QuantumCircuit, ParameterVector, Parameter
+from qiskit.circuit.library import RealAmplitudes, ZFeatureMap
 from qiskit.quantum_info import Statevector
 
 # from gradients import grad, itgrad
@@ -105,8 +106,6 @@ class TestGradients(TestCase):
 
     @data('reference_gradients', 'iterative_gradients')
     def test_partial_large_circuit(self, method):
-        from qiskit.circuit.library import RealAmplitudes, ZFeatureMap
-        from gradients.split_circuit import split
         np.random.seed(21)
 
         featuremap = ZFeatureMap(2, reps=1)
@@ -126,6 +125,22 @@ class TestGradients(TestCase):
                -0.07972088641561373]
 
         np.testing.assert_array_almost_equal(grads, ref)
+
+    @data('reference_gradients', 'iterative_gradients')
+    def test_product_rule(self, method):
+        x = Parameter('x')
+        circuit = QuantumCircuit(1)
+        circuit.rx(x, 0)
+        circuit.ry(x, 0)
+        circuit.rx(x, 0)
+
+        state_in = Statevector.from_int(1, dims=(2,))
+
+        grad = StateGradient(Z, circuit, state_in, [x])
+        grads = getattr(grad, method)({x: 1})
+
+        print(Gradient().convert(~StateFn(Z) @ StateFn(circuit), params=[x]).bind_parameters({x: 1}).eval())
+
 
 
 if __name__ == '__main__':
