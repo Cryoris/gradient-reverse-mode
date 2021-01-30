@@ -142,8 +142,7 @@ class StateGradient:
 # pylint: disable=inconsistent-return-statements
 def _bind(circuits, parameter_binds, inplace=False):
     if not isinstance(circuits, list):
-        existing_parameter_binds = {
-            p: parameter_binds[p] for p in circuits.parameters}
+        existing_parameter_binds = {p: parameter_binds[p] for p in circuits.parameters}
         return circuits.assign_parameters(existing_parameter_binds, inplace=inplace)
 
     bound = []

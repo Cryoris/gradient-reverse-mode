@@ -73,11 +73,13 @@ class Benchmark:
                 args = self.nreps * [(ansatz, operator, state_in, free_parameters,
                                       parameter_binds)]
 
-            # all_results = []
-            # for i, arg in enumerate(args):
-            #     all_results.append(single_run(arg))
-            with Pool(processes=NUM_PROCESSES) as pool:
-                all_results = pool.map(single_run, args)
+            if NUM_PROCESSES == 1:
+                all_results = []
+                for i, arg in enumerate(args):
+                    all_results.append(single_run(arg))
+            else:
+                with Pool(processes=NUM_PROCESSES) as pool:
+                    all_results = pool.map(single_run, args)
 
             # extract the results
             grad_runtimes, itgrad_runtimes = [], []
@@ -129,11 +131,12 @@ class Benchmark:
         else:
             data = self.load_benchmark(filename)
 
-        colors = ['tab:blue', 'tab:orange']
+        plt.style.use('seaborn')
+        colors = ['tab:blue', 'tab:green']
         markers = ['o', '^']
         linestyles = ['--', ':']
         methods = ['grad', 'itgrad']
-        labels = ['reference', 'reverse mode']
+        labels = ['standard', 'reverse mode']
         if cutoffs is None:
             cutoffs = [0, 0]
 
@@ -166,16 +169,16 @@ class Benchmark:
 
         handles, labels = plt.gca().get_legend_handles_labels()
         order = [2, 3, 0, 1]
-        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], loc='best',
-                   ncol=2)
+        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], 
+                   loc='upper left', ncol=2)
         # plt.legend(loc='best', ncol=2)
         plt.xticks([50, 100, 500], [r'$0.5 \cdot 10^2$',
                                     r'$10^2$', r'$0.5 \cdot 10^3$'])
         if saveas is None:
             saveas = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}.pdf'
 
-        plt.grid()
         plt.savefig('img/' + saveas, bbox_inches='tight')
+        plt.ylim(top=1e4)
         if show:
             plt.show()
 

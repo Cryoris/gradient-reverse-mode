@@ -1,19 +1,20 @@
-"""A classification example where we we only have asymptotically 1/4th of parameterized gates."""
+"""Maxcut example."""
 
 import numpy as np
-from qiskit import QuantumCircuit
-from qiskit.circuit.library import ZFeatureMap, RealAmplitudes
+from qiskit.algorithms.minimum_eigen_solvers.qaoa.var_form import QAOAVarForm
+from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit.circuit.parametertable import ParameterTable
-from qiskit.opflow import H
+from qiskit.opflow import Z, I, H
 
 from .benchmark import Benchmark
 
-class Classification(QuantumCircuit):
-    """UCCSD with the same API as Qiskit's circuit library."""
+class QAOAAnsatz(QuantumCircuit):
+    """QAOA ansatz as a quantum circuit."""
 
-    def __init__(self, num_qubits, reps=3):
+    def __init__(self, operator, reps=1):
         self._reps = reps
-        super().__init__(num_qubits)
+        self._operator = operator
+        super().__init__(operator.num_qubits)
         self._build()
 
     @property
@@ -36,30 +37,29 @@ class Classification(QuantumCircuit):
 
     @property
     def ordered_parameters(self):
-        return list(self._parameter_table.keys())
+        return self._params[:]
 
     def _build(self):
         # wipe current state
         self._data = []
         self._parameter_table = ParameterTable()
 
-        # get UCCSD circuit
-        featmap = ZFeatureMap(self.num_qubits, reps=self.reps)
-        ansatz = RealAmplitudes(self.num_qubits, reps=self.reps, entanglement='circular')
+        # get QAOA circuit
+        qaoa = QAOAVarForm(self._operator, self._reps)
+        params = ParameterVector('th', qaoa.num_parameters)
+        circuit = qaoa.construct_circuit(params)
 
         # store the parameters in a list for assigning them
-        self._params = ansatz.ordered_parameters
+        self._params = params
 
-        # set the data circuit with some input data
-        featmap.assign_parameters(np.random.random(featmap.num_parameters), inplace=True)
 
         # combine the circuit
-        self.compose(featmap, inplace=True)
-        self.compose(ansatz, inplace=True)
+        self.compose(circuit, inplace=True)
 
 
-def run_featuremap():
-    circuit = Classification(4)
+def run_maxcut():
+    operator = (I ^ I ^ Z ^ Z) + (I ^ Z ^ I ^ Z) + (Z ^ I ^ I ^ Z) + (I ^ Z ^ Z ^ I)
+    circuit = QAOAAnsatz(operator)
 
     benchmark = Benchmark(2 ** np.arange(2, 8), H, 24)
     benchmark.run_benchmark(circuit, 'free')

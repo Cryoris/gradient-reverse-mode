@@ -1,4 +1,4 @@
-from qiskit.circuit import QuantumCircuit, ParameterExpression
+from qiskit.circuit import QuantumCircuit, ParameterExpression, Parameter
 
 
 def split(circuit, parameters='all',
@@ -24,10 +24,18 @@ def split(circuit, parameters='all',
             params = op[0].params
         elif parameters == 'free':
             params = [param for param in op[0].params if isinstance(param, ParameterExpression)]
-        elif isinstance(parameters, ParameterExpression):
-            params = [parameters] if parameters in op[0].params else []
+        elif isinstance(parameters, Parameter):
+            if op[0].definition is not None:
+                free_op_params = op[0].definition.parameters
+            else:
+                free_op_params = {}
+            params = [parameters] if parameters in free_op_params else []
         elif isinstance(parameters, list):
-            params = [p for p in parameters if p in op[0].params]
+            if op[0].definition is not None:
+                free_op_params = op[0].definition.parameters
+            else:
+                free_op_params = {}
+            params = [p for p in parameters if p in free_op_params]
         else:
             raise NotImplementedError('Unsupported type of parameters:', parameters)
 
