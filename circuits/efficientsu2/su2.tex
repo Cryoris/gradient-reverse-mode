@@ -1,0 +1,28 @@
+\documentclass[preview]{standalone}
+% If the image is too large to fit on this documentclass use
+% \documentclass[draft]{beamer}
+% img_width = 5, img_depth = 10
+% \usepackage[size=custom,height=10,width=39,scale=0.7]{beamerposter}
+\usepackage[total={10in, 2in}]{geometry}
+% instead and customize the height and width (in cm) to fit.
+% Large images may run out of memory quickly.
+% To fix this use the LuaLaTeX compiler, which dynamically
+% allocates memory.
+\usepackage[braket, qm]{qcircuit}
+\usepackage{amsmath}
+\pdfmapfile{+sansmathaccent.map}
+% \usepackage[landscape]{geometry}
+% Comment out the above line if using the beamer documentclass.
+\begin{document}
+
+\begin{equation*}
+    \Qcircuit @C=1.0em @R=0.0em @!R {
+	 	\lstick{ \ket{{0}} } & \gate{R_Y(\theta_0)} & \gate{R_Z(\theta_5)} & \ctrl{1} & \qw & \qw & \qw & \gate{R_Y(\theta_{10})} & \gate{R_Z(\theta_{15})} & \qw & \cdots\\
+	 	\lstick{ \ket{{0}} } & \gate{R_Y(\theta_1)} & \gate{R_Z(\theta_6)} & \targ & \ctrl{1} & \qw & \qw & \gate{R_Y(\theta_{11})} & \gate{R_Z(\theta_{16})} & \qw & \cdots\\
+	 	\lstick{ \ket{{0}} } & \gate{R_Y(\theta_2)} & \gate{R_Z(\theta_7)} & \qw & \targ & \ctrl{1} & \qw & \gate{R_Y(\theta_{12})} & \gate{R_Z(\theta_{17})} & \qw & \cdots\\
+	 	\lstick{ \ket{{0}} } & \gate{R_Y(\theta_3)} & \gate{R_Z(\theta_8)} & \qw & \qw & \targ & \ctrl{1} & \gate{R_Y(\theta_{13})} & \gate{R_Z(\theta_{18})} & \qw & \cdots\\
+	 	\lstick{ \ket{{0}} } & \gate{R_Y(\theta_4)} & \gate{R_Z(\theta_9)} & \qw & \qw & \qw & \targ & \gate{R_Y(\theta_{14})} & \gate{R_Z(\theta_{19})} & \qw & \cdots\\
+	 }
+\end{equation*}
+
+\end{document}
