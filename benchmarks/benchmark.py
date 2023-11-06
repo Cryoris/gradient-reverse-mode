@@ -131,7 +131,7 @@ class Benchmark:
         else:
             data = self.load_benchmark(filename)
 
-        plt.style.use('seaborn')
+        # plt.style.use('seaborn-paper')
         colors = ['tab:blue', 'tab:green']
         markers = ['o', '^']
         linestyles = ['--', ':']
@@ -141,6 +141,7 @@ class Benchmark:
             cutoffs = [0, 0]
 
         plt.figure(figsize=(4, 3))
+        plt.grid()
         plt.loglog()  # shortcut for getting log scaling on x and y axis
         for (
                 method, color, marker, line, label, cutoff
@@ -159,7 +160,7 @@ class Benchmark:
             (a, b), _ = curve_fit(lambda x, a, b: a *
                                   x + b, np.log(nums_parameters), np.log(avg))
             plt.plot(nums_parameters, nums_parameters ** a * np.exp(b), 'k' + line,
-                     label=r'$O^{' + f'{np.round(a, 2)}' + r'}$')
+                     label=r'$P^{' + f'{np.round(a, 2)}' + r'}$')
 
         # plt.title('Gradient run comparison')
         plt.xlabel('number of ansatz parameters, $P$')
@@ -172,8 +173,10 @@ class Benchmark:
         plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], 
                    loc='upper left', ncol=2)
         # plt.legend(loc='best', ncol=2)
-        plt.xticks([50, 100, 500], [r'$0.5 \cdot 10^2$',
-                                    r'$10^2$', r'$0.5 \cdot 10^3$'])
+        # plt.xticks([50, 500], [r'$0.5 \cdot 10^2$',
+        #                        r'$0.5 \cdot 10^3$'])
+        # plt.xticks([50, 100, 500], [r'$0.5 \cdot 10^2$',
+        #                             r'$10^2$', r'$0.5 \cdot 10^3$'])
         if saveas is None:
             saveas = f'ep_r{self.num_reps[0]}_{self.num_reps[-1]}.pdf'
 
